@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>cyberng admin</title><link rel="stylesheet" href="/style.css"></head>
+<body><div class="wrap">
+<h1>Admin</h1>
+<div id="login" class="card"><h3>Login</h3>
+<input id="u" placeholder="username"><input id="p" type="password" placeholder="password">
+<button class="btn" onclick="login()">Login</button></div>
+<div id="panel" style="display:none">
+<nav><button onclick="showStats()">Metrics</button> <button onclick="showZips()">Zips</button> <button onclick="showSettings()">Telegram</button></nav>
+<div id="content"></div>
+</div></div>
+<script>
+let TOK = localStorage.getItem('adm_tok') || '';
+if (TOK) { document.getElementById('login').style.display = 'none'; document.getElementById('panel').style.display = ''; showStats(); }
+async function login() {
+  const r = await fetch('/api/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: document.getElementById('u').value, password: document.getElementById('p').value }) }).then(x => x.json());
+  if (r.ok) { TOK = r.token; localStorage.setItem('adm_tok', TOK); document.getElementById('login').style.display = 'none'; document.getElementById('panel').style.display = ''; showStats(); }
+  else alert('bad login');
+}
+function hdr() { return { 'Content-Type': 'application/json', 'x-admin-token': TOK }; }
+async function showStats() {
+  const s = await fetch('/api/admin/stats', { headers: { 'x-admin-token': TOK } }).then(x => x.json());
+  const rows = (s.visits || []).map(v => `<tr><td>${v.ip}</td><td>${esc(v.country)}, ${esc(v.city)}</td><td>${esc(v.origin)}</td><td>${esc(v.browser)} / ${esc(v.os)} / ${esc(v.device)}</td><td>${esc(v.path)}</td></tr>`).join('');
+  const org = Object.entries(s.byOrigin || {}).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<tr><td>${esc(k)}</td><td>${v}</td></tr>`).join('');
+  const geo = Object.entries(s.byGeo || {}).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<tr><td>${esc(k)}</td><td>${v}</td></tr>`).join('');
+  document.getElementById('content').innerHTML = `<div class="card"><h3>Metrics</h3>
+  <p>Visits ${s.totalVisits} (pc ${s.pcVisits}, mobile ${s.mobileVisits}) | Downloads ${s.totalDownloads}</p>
+  <p>Top origin ${esc(s.topOrigin)} | Top place ${esc(s.topGeo)}</p>
+  <h4>Per zip downloads</h4><pre>${esc(JSON.stringify(s.perZip, null, 1))}</pre>
+  <h4>Origin breakdown</h4><table>${org}</table>
+  <h4>Country city breakdown</h4><table>${geo}</table>
+  <h4>Recent visits</h4><table>${rows}</table></div>`;
+}
+async function showZips() {
+  const d = await fetch('/api/admin/zips', { headers: { 'x-admin-token': TOK } }).then(x => x.json());
+  let html = `<div class="card"><h3>New zip</h3><input id="nz_t" placeholder="title"><textarea id="nz_d" placeholder="desc"></textarea>
+  <label><input type="checkbox" id="nz_l" style="width:auto"> locked</label>
+  <textarea id="nz_v" placeholder="videos, one URL per line"></textarea>
+  <button class="btn" onclick="createZip()">Add</button></div>`;
+  d.zips.forEach(z => {
+    html += `<div class="card"><h3>${esc(z.title)} ${z.locked ? '(locked)' : '(unlocked)'}</h3>
+    <div class="small">${esc(z.id)} | ${z.downloads || 0} downloads | ${z.file || 'no file'}</div>
+    <input id="t_${z.id}" value="${esc(z.title)}"><textarea id="d_${z.id}">${esc(z.desc || '')}</textarea>
+    <label><input type="checkbox" id="l_${z.id}" ${z.locked ? 'checked' : ''} style="width:auto"> locked</label>
+    <textarea id="v_${z.id}" placeholder="videos one per line">${esc((z.videos || []).join('\n'))}</textarea>
+    <div><button class="btn" onclick="saveZip('${z.id}')">Save</button> <button class="btn dim" onclick="delZip('${z.id}')">Delete</button></div>
+    <div style="margin-top:8px"><input type="file" id="f_${z.id}"><button class="btn" onclick="upZip('${z.id}')">Upload real zip</button></div></div>`;
+  });
+  document.getElementById('content').innerHTML = html;
+}
+async function createZip() {
+  const videos = document.getElementById('nz_v').value.split('\n').map(s => s.trim()).filter(Boolean);
+  await fetch('/api/admin/zips', { method: 'POST', headers: hdr(), body: JSON.stringify({ title: document.getElementById('nz_t').value, desc: document.getElementById('nz_d').value, locked: document.getElementById('nz_l').checked, videos }) });
+  showZips();
+}
+async function saveZip(id) {
+  const videos = document.getElementById('v_' + id).value.split('\n').map(s => s.trim()).filter(Boolean);
+  await fetch('/api/admin/zips/' + id, { method: 'PUT', headers: hdr(), body: JSON.stringify({ title: document.getElementById('t_' + id).value, desc: document.getElementById('d_' + id).value, locked: document.getElementById('l_' + id).checked, videos }) });
+  showZips();
+}
+async function delZip(id) { if (!confirm('delete?')) return; await fetch('/api/admin/zips/' + id, { method: 'DELETE', headers: { 'x-admin-token': TOK } }); showZips(); }
+async function upZip(id) {
+  const f = document.getElementById('f_' + id).files[0]; if (!f) return alert('pick file');
+  const fd = new FormData(); fd.append('file', f);
+  await fetch('/api/admin/upload/' + id, { method: 'POST', headers: { 'x-admin-token': TOK }, body: fd });
+  showZips();
+}
+async function showSettings() {
+  const s = await fetch('/api/admin/stats', { headers: { 'x-admin-token': TOK } }).then(x => x.json());
+  document.getElementById('content').innerHTML = `<div class="card"><h3>Telegram</h3>
+  <div class="small">Only PC visits notify. Mobile stored but silent. Same IP same path within 15s edits message with REVISIT xN. Bot command /visited works.</div>
+  <input id="bot" placeholder="bot token"><input id="chat" placeholder="chat id" value="${esc(s.settings.chatId || '')}">
+  <button class="btn" onclick="saveSet()">Save</button> <button class="btn dim" onclick="testTg()">Test</button></div>`;
+}
+async function saveSet() {
+  await fetch('/api/admin/settings', { method: 'POST', headers: hdr(), body: JSON.stringify({ botToken: document.getElementById('bot').value || undefined, chatId: document.getElementById('chat').value }) });
+  alert('saved');
+}
+async function testTg() { const r = await fetch('/api/admin/test-telegram', { method: 'POST', headers: { 'x-admin-token': TOK } }).then(x => x.json()); alert(JSON.stringify(r)); }
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+</script></body></html>

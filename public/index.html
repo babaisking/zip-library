@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Zip Library</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header><div class="wrap">
+<h1>Zip Library</h1>
+<div class="sub">Simple zip collection. Minimal and fast.</div>
+<div class="passbanner">Archive password always <b>thing</b>. Every zip on this site uses it.</div>
+<nav>
+<button data-tab="lib" class="on">Library</button>
+<button data-tab="pass">What is the password</button>
+<button data-tab="ref">Referral</button>
+</nav>
+<div id="mobileMsg"></div>
+</div></header>
+<div class="wrap">
+<section id="tab-lib"></section>
+<section id="tab-pass" style="display:none"><div class="card">
+<h3>What is the password</h3>
+<p>The password is: <b>thing</b></p>
+<p>All the passwords for all the zips will always be: <b>thing</b>. Just the word thing itself.</p>
+<p class="small">Use a PC to extract. Password protected zips need a desktop extractor.</p>
+</div></section>
+<section id="tab-ref" style="display:none"><div class="card">
+<h3>Referral</h3>
+<p>Share your link. If someone downloads with it, you unlock locked archives.</p>
+<p id="refInfo">Loading</p>
+</div></section>
+</div>
+<script src="/app.js"></script>
+</body>
+</html>

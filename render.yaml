@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: zip-library
+    runtime: docker
+    plan: starter
+    healthCheckPath: /api/zips
+    envVars:
+      - key: TELEGRAM_CHAT_ID
+        value: -5417526972
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: ADMIN_USER
+        value: root
+      - key: ADMIN_PASS
+        sync: false
+    disk:
+      name: zipdata
+      mountPath: /app/data
+      sizeGB: 1
