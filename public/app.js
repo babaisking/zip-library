@@ -50,14 +50,9 @@ document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ path: location.pathname, referrer: document.referrer, ref: localStorage.getItem('inbound_ref') || myRefQuery || '', navType: nav, signals: signals() })
   }).then(x => x.json()).then(j => {
-    if (j && j.device === 'mobile') { serverSaysMobile = true; paintMobile(); }
+    if (j && j.device === 'mobile') { serverSaysMobile = true; takeover(); }
   }).catch(() => {});
 })();
-
-function paintMobile() {
-  document.getElementById('mobileMsg').innerHTML = '<div class="mobilewarn"><b>This site needs a computer.</b><br>You are on a phone or tablet. Zip extraction does not work on mobile, so downloads are off here. You can look around and share links, but to download and extract you must open this page on a PC. Password is <b>thing</b>.</div>';
-  load();
-}
 
 function looksMobile() {
   if (serverSaysMobile) return true;
@@ -68,9 +63,22 @@ function looksMobile() {
   return false;
 }
 
+// Mobile gets landing only: instant full screen takeover, library never loads.
+function takeover() {
+  document.getElementById('pwPopup').style.display = 'none';
+  document.getElementById('takeover').style.display = 'flex';
+}
+function copyLink() {
+  try {
+    navigator.clipboard.writeText(location.href);
+    document.getElementById('copyMsg').textContent = 'Copied. Open it on your computer.';
+  } catch (e) { document.getElementById('copyMsg').textContent = location.href; }
+}
+if (looksMobile()) takeover();
+
 async function load() {
-  const mm = document.getElementById('mobileMsg');
-  const mobile = looksMobile();
+  if (looksMobile()) { takeover(); return; }
+  const mobile = false;
   if (mobile && !mm.innerHTML) {
     mm.innerHTML = '<div class="mobilewarn"><b>This site needs a computer.</b><br>You are on a phone or tablet. Zip extraction does not work on mobile, so downloads are off here. You can look around and share links, but to download and extract you must open this page on a PC. Password is <b>thing</b>.</div>';
   }
@@ -114,7 +122,7 @@ async function dl(id) {
   }).then(x => x.json()).catch(() => ({}));
   if (!r.ok) {
     alert(r.error === 'pc only' ? 'Downloads need a computer. Phones and tablets are blocked, including desktop site mode.' : (r.error === 'locked' ? 'Locked archive. Get a download through your referral link first.' : 'Download not available right now.'));
-    if (r.device === 'mobile') { serverSaysMobile = true; paintMobile(); }
+    if (r.device === 'mobile') { serverSaysMobile = true; takeover(); }
     return;
   }
   location.href = '/api/download/' + id + '?t=' + encodeURIComponent(r.token) + (inbound ? '&ref=' + encodeURIComponent(inbound) : '');
