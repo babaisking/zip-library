@@ -37,6 +37,7 @@ async function showZips() {
   let html = `<div class="card"><h3>New zip</h3><input id="nz_t" placeholder="title"><textarea id="nz_d" placeholder="desc"></textarea>
   <label><input type="checkbox" id="nz_l" style="width:auto"> locked</label>
   <textarea id="nz_v" placeholder="videos, one URL per line"></textarea>
+  <div style="margin-top:8px"><input type="file" id="nz_f" accept=".zip,.rar,.7z"><div class="small">Pick the zip now and it uploads right after Add. Or leave empty and attach later below.</div></div>
   <button class="btn" onclick="createZip()">Add</button></div>`;
   d.zips.forEach(z => {
     html += `<div class="card"><h3>${esc(z.title)} ${z.locked ? '(locked)' : '(unlocked)'}</h3>
@@ -51,7 +52,12 @@ async function showZips() {
 }
 async function createZip() {
   const videos = document.getElementById('nz_v').value.split('\n').map(s => s.trim()).filter(Boolean);
-  await fetch('/api/admin/zips', { method: 'POST', headers: hdr(), body: JSON.stringify({ title: document.getElementById('nz_t').value, desc: document.getElementById('nz_d').value, locked: document.getElementById('nz_l').checked, videos }) });
+  const r = await fetch('/api/admin/zips', { method: 'POST', headers: hdr(), body: JSON.stringify({ title: document.getElementById('nz_t').value, desc: document.getElementById('nz_d').value, locked: document.getElementById('nz_l').checked, videos }) }).then(x => x.json());
+  const f = document.getElementById('nz_f').files[0];
+  if (f && r.zip) {
+    const fd = new FormData(); fd.append('file', f);
+    await fetch('/api/admin/upload/' + r.zip.id, { method: 'POST', headers: { 'x-admin-token': TOK }, body: fd });
+  }
   showZips();
 }
 async function saveZip(id) {

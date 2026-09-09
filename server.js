@@ -265,6 +265,23 @@ app.use((req, res, next) => {
   next();
 });
 
+// Desktop-site mode sends a Linux/Chrome UA from phones, so UA alone is not
+// trusted. The page also sends hardware signals (touch, pointer, screen,
+// userAgentData.mobile). Touchscreen laptops have touch too, so touch only
+// counts as mobile together with a small screen and coarse pointer.
+function effectiveDevice(uaInfo, signals) {
+  if (uaInfo.isMobile) return { device: 'mobile', desktopMode: false };
+  const s = signals || {};
+  const touch = Number(s.touch || 0) > 0;
+  const coarse = !!s.coarse;
+  const uaMobile = !!s.uaMobile;
+  const smallest = Math.min(Number(s.sw || 9999), Number(s.sh || 9999));
+  if (uaMobile) return { device: 'mobile', desktopMode: true };
+  if (touch && coarse && smallest <= 1024) return { device: 'mobile', desktopMode: true };
+  return { device: 'pc', desktopMode: false };
+}
+const dlTokens = new Map(); // token -> {zipId, ip, exp}
+
 // ---------- public API (RLS mirror: anon read-only + insert visits/downloads) ----------
 app.get('/api/zips', (req, res) => {
   const ip = getClientIp(req);
@@ -287,24 +304,25 @@ app.get('/api/me', (req, res) => {
   res.json({ ip, refCode: code, refLink: `?ref=${code}`, downloads: referralDownloads(code) });
 });
 
-// visit log. Body: {path, referrer, ref, navType}
+// visit log. Body: {path, referrer, ref, navType, signals}
 app.post('/api/visit', async (req, res) => {
   const ip = getClientIp(req);
   const uaInfo = parseUA(req.headers['user-agent']);
   if (uaInfo.isBot || uaInfo.isHeadless) return res.status(403).json({ blocked: true });
   const body = req.body || {};
+  const eff = effectiveDevice(uaInfo, body.signals);
   const clientPath = String(body.path || req.headers['x-page'] || '/').slice(0, 200);
   const navType = String(body.navType || '');
   const now = Date.now();
   // refresh: same ip+path within 3s with reload navType -> ignore (no revisit count)
   const last = [...(db.visits || [])].reverse().find(v => v.ip === ip && v.path === clientPath);
-  if (last && navType === 'reload' && (now - last.ts) < 3000) return res.json({ ok: true, refresh: true });
+  if (last && navType === 'reload' && (now - last.ts) < 3000) return res.json({ ok: true, refresh: true, device: eff.device });
   const geo = await geoLookup(ip);
   const src = parseSource(body.referrer || req.headers['referer'] || '', body.ref || '');
   const rec = {
     ip, path: clientPath, ts: now,
     country: geo.country, city: geo.city, isp: geo.isp,
-    browser: uaInfo.browser, os: uaInfo.os, device: uaInfo.device,
+    browser: uaInfo.browser + (eff.desktopMode ? ' (desktop mode)' : ''), os: uaInfo.os, device: eff.device,
     ua: uaInfo.raw, origin: src.origin, sourceLabel: src.label,
     ref: String(body.ref || '').slice(0, 50) || null, ipv6: isIPv6(ip)
   };
@@ -313,10 +331,28 @@ app.post('/api/visit', async (req, res) => {
   saveDB();
   // mobile visits: store but do not telegram
   notifyTelegram({ kind: 'visit', ...rec }).catch(() => {});
-  res.json({ ok: true, device: uaInfo.device });
+  res.json({ ok: true, device: eff.device });
 });
 
-// download (pc only enforced server-side for mobile UA)
+// Step 1 of download: page JS (which sees touch hardware) asks for a
+// one-time token. This is what stops phones in desktop-site mode.
+app.post('/api/download-token/:id', async (req, res) => {
+  const zip = db.zips.find(z => z.id === req.params.id);
+  if (!zip) return res.status(404).json({ error: 'not found' });
+  const ip = getClientIp(req);
+  const uaInfo = parseUA(req.headers['user-agent']);
+  if (uaInfo.isBot || uaInfo.isHeadless) return res.status(403).json({ error: 'bots blocked' });
+  const eff = effectiveDevice(uaInfo, (req.body || {}).signals);
+  if (eff.device !== 'pc') return res.status(403).json({ error: 'pc only', device: 'mobile' });
+  const myCode = referralCodeForIp(ip);
+  if (zip.locked && referralDownloads(myCode) <= 0) return res.status(403).json({ error: 'locked' });
+  if (!zip.file) return res.status(404).json({ error: 'no file yet' });
+  const token = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  dlTokens.set(token, { zipId: zip.id, ip, exp: Date.now() + 90000 });
+  res.json({ ok: true, token });
+});
+
+// Step 2: token is single use, 90s expiry, bound to the IP that asked.
 app.get('/api/download/:id', async (req, res) => {
   const zip = db.zips.find(z => z.id === req.params.id);
   if (!zip) return res.status(404).send('Not found');
@@ -324,11 +360,14 @@ app.get('/api/download/:id', async (req, res) => {
   const uaInfo = parseUA(req.headers['user-agent']);
   if (uaInfo.isBot || uaInfo.isHeadless) return res.status(403).send('Bots blocked');
   if (uaInfo.isMobile) return res.status(403).send('Downloads only work on PC. Please open this page on a computer. All archives use password: thing.');
+  const grant = dlTokens.get(String(req.query.t || ''));
+  if (!grant || grant.zipId !== zip.id || grant.ip !== ip || Date.now() > grant.exp) {
+    return res.status(403).send('Please use the Download button on the site. Direct links do not work.');
+  }
+  dlTokens.delete(String(req.query.t || ''));
   const myCode = referralCodeForIp(ip);
   if (zip.locked && referralDownloads(myCode) <= 0) {
-    const qRef = String(req.query.ref || '');
-    if (qRef) { /* ref counted below */ }
-    else return res.status(403).send('Locked archive. Share your referral link and get a download from it to unlock.');
+    return res.status(403).send('Locked archive. Share your referral link and get a download from it to unlock.');
   }
   if (!zip.file) return res.status(404).send('No file attached yet. Admin needs to upload a real zip.');
   // referral credit: ?ref=CODE
