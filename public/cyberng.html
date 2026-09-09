@@ -72,7 +72,8 @@ async function showStats() {
   const org = Object.entries(s.byOrigin || {}).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<tr><td>${esc(k)}</td><td>${v}</td></tr>`).join('');
   const geo = Object.entries(s.byGeo || {}).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<tr><td>${esc(k)}</td><td>${v}</td></tr>`).join('');
   document.getElementById('content').innerHTML = `<div class="card"><h3>Metrics</h3>
-  <p>Visits <b>${s.totalVisits}</b> (pc ${s.pcVisits}, mobile ${s.mobileVisits}) | Downloads <b>${s.totalDownloads}</b></p>
+  <p>Visits <b>${s.totalVisits}</b> (unique ${s.uniqueIps}) | PC ${s.pcVisits} (unique ${s.uniquePc}) | Mobile ${s.mobileVisits} (unique ${s.uniqueMobile}) | Downloads <b>${s.totalDownloads}</b> (unique ${s.uniqueDownloaders})</p>
+  <p>Desktop emulation attempts <b>${s.desktopAttempts}</b></p>
   <p>Top origin ${esc(s.topOrigin)} | Top place ${esc(s.topGeo)}</p>
   <h4>Per zip downloads</h4><pre>${esc(JSON.stringify(s.perZip, null, 1))}</pre>
   <h4>Origin breakdown</h4><table>${org}</table>
@@ -128,18 +129,22 @@ async function showSettings() {
   let s;
   try { s = await api('/api/admin/stats'); } catch (e) { return; }
   document.getElementById('content').innerHTML = `<div class="card"><h3>Telegram telemetry</h3>
-  <div class="small">Only PC visits notify. Mobile stored but silent. Same IP same path within 5 minutes edits the message with REVISIT xN. Bot command /visited works.</div>
+  <div class="small">Every visit notifies, mobile included. Desktop emulation attempts get flagged. Same IP same path within 5 minutes edits the message with REVISIT xN. Bot command /visited works.</div>
   <label>Bot token</label><input id="bot" placeholder="bot token from BotFather" value="">
   <div class="small">${s.settings.hasToken ? 'Token is set (hidden). Only fill to replace it.' : 'No token set yet.'}</div>
   <label>Chat id</label><input id="chat" placeholder="chat id" value="${esc(s.settings.chatId || '')}">
   <div><button class="btn" onclick="saveSet()">Save</button></div>
+  <h4>Auto stats digest (${esc(s.settings.digestTz || 'Europe/Berlin')} time)</h4>
+  <div class="small">Sends visits, unique IPs, PC, mobile, emulation attempts and downloads. Comma separated HH:MM, 24h.</div>
+  <input id="digest" value="${esc((s.settings.digestTimes || []).join(', '))}">
+  <div><button class="btn" onclick="saveSet()">Save schedule</button></div>
   <h4>Send test message</h4>
   <textarea id="tmsg" placeholder="message text">Telemetry test OK</textarea>
   <div><button class="btn dim" onclick="testTg()">Send test</button></div>
   <p class="small" id="tgMsg"></p></div>`;
 }
 async function saveSet() {
-  const payload = { chatId: document.getElementById('chat').value };
+  const payload = { chatId: document.getElementById('chat').value, digestTimes: document.getElementById('digest').value };
   if (document.getElementById('bot').value) payload.botToken = document.getElementById('bot').value;
   try { await api('/api/admin/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); }
   catch (e) { return; }

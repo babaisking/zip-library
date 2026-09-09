@@ -188,6 +188,7 @@ function fmtMsg(o) {
   if (o.revisit && o.revisit > 0) lines.push(`🔁 REVISIT x${o.revisit}`);
   lines.push(`📄 path: ${o.path}`);
   lines.push(`🖥 device: ${o.device === 'pc' ? 'PC' : 'Mobile'}`);
+  if (o.desktopMode) lines.push(`⚠️ attempted desktop emulation`);
   lines.push(`💻 os: ${o.os}`);
   lines.push(`🌐 browser: ${o.browser}`);
   lines.push(`🧾 ua: ${String(o.ua || '').slice(0, 200)}`);
@@ -208,8 +209,8 @@ async function notifyTelegram(evt) {
   const chatId = db.settings.chatId;
   const token = db.settings.botToken;
   if (!token || !chatId) return;
-  // Only PC visits notify. Mobile disabled. Downloads always notify (pc only anyway since mobile blocked).
-  if (evt.device !== 'pc') return;
+  // Every visit notifies, including mobile. Same IP + path within 5 minutes
+  // edits the message with REVISIT xN instead of sending a new one.
   const key = evt.ip + '|' + evt.path;
   const now = Date.now();
   const prev = revisitMap.get(key);
@@ -248,13 +249,59 @@ async function pollBot() {
         const msg = u.message;
         if (msg && msg.text && msg.text.trim() === '/visited') {
           const s = buildStats();
-          const text = `📊 /visited\n👁 Visits: ${s.totalVisits} (pc ${s.pcVisits}, mobile ${s.mobileVisits})\n📥 Downloads: ${s.totalDownloads}\n🏆 Top origin: ${s.topOrigin || '-'}\n🌍 Top place: ${s.topGeo || '-'}`;
+          const text = `📊 /visited\n👁 Visits: ${s.totalVisits} (unique ${s.uniqueIps})\n🖥 PC: ${s.pcVisits} | 📱 Mobile: ${s.mobileVisits}\n⚠️ Emulation: ${s.desktopAttempts}\n📥 Downloads: ${s.totalDownloads} (unique ${s.uniqueDownloaders})\n🏆 Top origin: ${s.topOrigin || '-'}\n🌍 Top place: ${s.topGeo || '-'}`;
           await tgApi('sendMessage', { chat_id: msg.chat.id, text });
         }
       }
     }
   } catch (e) {}
-  setTimeout(pollBot, 3000);
+setTimeout(pollBot, 3000);
+
+// ---------- scheduled digest (Europe/Berlin wall clock, configurable) ----------
+function digestTimes() {
+  const t = db.settings.digestTimes;
+  if (Array.isArray(t) && t.length) return t;
+  return ['12:00', '00:00'];
+}
+function digestTz() { return db.settings.digestTz || 'Europe/Berlin'; }
+function nowInTz(tz) {
+  const parts = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date());
+  const g = (k) => Number((parts.find(p => p.type === k) || {}).value || 0);
+  return { h: g('hour') % 24, m: g('minute') };
+}
+function digestText() {
+  const s = buildStats();
+  return `📊 Auto stats (${digestTz()})\n` +
+    `👁 Visits: ${s.totalVisits} (unique ${s.uniqueIps})\n` +
+    `🖥 PC: ${s.pcVisits} (unique ${s.uniquePc})\n` +
+    `📱 Mobile: ${s.mobileVisits} (unique ${s.uniqueMobile})\n` +
+    `⚠️ Desktop emulation attempts: ${s.desktopAttempts}\n` +
+    `📥 Downloads: ${s.totalDownloads} (unique ${s.uniqueDownloaders})\n` +
+    `🏆 Top origin: ${s.topOrigin}\n` +
+    `🌍 Top place: ${s.topGeo}`;
+}
+let digestTimer = null;
+function scheduleDigest() {
+  if (digestTimer) clearTimeout(digestTimer);
+  const tz = digestTz();
+  const now = nowInTz(tz);
+  const nowMin = now.h * 60 + now.m;
+  let best = null;
+  for (const t of digestTimes()) {
+    const m = String(t).match(/^(\d{1,2}):(\d{2})/);
+    if (!m) continue;
+    const target = (Number(m[1]) % 24) * 60 + Number(m[2]);
+    let diff = target - nowMin;
+    if (diff <= 0) diff += 24 * 60;
+    if (best === null || diff < best) best = diff;
+  }
+  if (best === null) best = 12 * 60;
+  digestTimer = setTimeout(async () => {
+    try { await tgApi('sendMessage', { chat_id: db.settings.chatId, text: digestText() }); } catch (e) {}
+    scheduleDigest();
+  }, best * 60 * 1000);
+}
+scheduleDigest();
 }
 setTimeout(pollBot, 3000);
 
@@ -263,6 +310,12 @@ function buildStats() {
   const totalVisits = visits.length;
   const pcVisits = visits.filter(v => v.device === 'pc').length;
   const mobileVisits = totalVisits - pcVisits;
+  const desktopAttempts = visits.filter(v => v.desktopMode).length;
+  const uniq = (arr) => new Set(arr.map(v => v.ip)).size;
+  const uniqueIps = uniq(visits);
+  const uniquePc = uniq(visits.filter(v => v.device === 'pc'));
+  const uniqueMobile = uniq(visits.filter(v => v.device !== 'pc'));
+  const uniqueDownloaders = new Set((db.downloads || []).map(d => d.ip)).size;
   const totalDownloads = (db.downloads || []).length;
   const byOrigin = {};
   const byGeo = {};
@@ -277,7 +330,7 @@ function buildStats() {
   const tO = top(byOrigin), tG = top(byGeo);
   const perZip = {};
   (db.downloads || []).forEach(d => { perZip[d.zipId] = (perZip[d.zipId] || 0) + 1; });
-  return { totalVisits, pcVisits, mobileVisits, totalDownloads, byOrigin, byGeo, byBrowser, topOrigin: tO ? `${tO[0]} (${tO[1]})` : '-', topGeo: tG ? `${tG[0]} (${tG[1]})` : '-', perZip };
+  return { totalVisits, pcVisits, mobileVisits, desktopAttempts, uniqueIps, uniquePc, uniqueMobile, uniqueDownloaders, totalDownloads, byOrigin, byGeo, byBrowser, topOrigin: tO ? `${tO[0]} (${tO[1]})` : '-', topGeo: tG ? `${tG[0]} (${tG[1]})` : '-', perZip };
 }
 
 // ---------- middleware ----------
@@ -354,7 +407,7 @@ app.post('/api/visit', async (req, res) => {
     browser: uaInfo.browser + (eff.desktopMode ? ' (desktop mode)' : ''), os: uaInfo.os, device: eff.device,
     ua: uaInfo.raw, origin: src.origin, sourceLabel: src.label,
     ref: String(body.ref || '').slice(0, 50) || null, ipv6: isIPv6(ip),
-    hw: cleanHw(body.signals)
+    hw: cleanHw(body.signals), desktopMode: !!eff.desktopMode
   };
   db.visits.push(rec);
   if (db.visits.length > 5000) db.visits = db.visits.slice(-5000);
@@ -448,7 +501,7 @@ app.post('/api/admin/login', (req, res) => {
   res.status(401).json({ error: 'bad login' });
 });
 app.get('/api/admin/stats', adminAuth, (req, res) => {
-  res.json({ ...buildStats(), visits: db.visits.slice(-200).reverse(), downloads: db.downloads.slice(-200).reverse(), referrals: db.referrals, settings: { chatId: db.settings.chatId, hasToken: !!db.settings.botToken } });
+  res.json({ ...buildStats(), visits: db.visits.slice(-200).reverse(), downloads: db.downloads.slice(-200).reverse(), referrals: db.referrals, settings: { chatId: db.settings.chatId, hasToken: !!db.settings.botToken, digestTimes: digestTimes(), digestTz: digestTz() } });
 });
 app.get('/api/admin/zips', adminAuth, (req, res) => { res.json({ zips: db.zips }); });
 app.post('/api/admin/zips', adminAuth, (req, res) => {
@@ -492,11 +545,16 @@ app.post('/api/admin/upload/:id', adminAuth, upload.single('file'), (req, res) =
   res.json({ ok: true, zip: z });
 });
 app.post('/api/admin/settings', adminAuth, (req, res) => {
-  const { botToken, chatId } = req.body || {};
+  const { botToken, chatId, digestTimes: dt } = req.body || {};
   if (botToken !== undefined) db.settings.botToken = String(botToken).slice(0, 100);
   if (chatId !== undefined) db.settings.chatId = String(chatId).slice(0, 50);
+  if (dt !== undefined) {
+    const arr = String(dt).split(',').map(s => s.trim()).filter(s => /^\d{1,2}:\d{2}$/.test(s)).slice(0, 12);
+    if (arr.length) db.settings.digestTimes = arr;
+  }
   saveDB();
-  res.json({ ok: true, settings: { chatId: db.settings.chatId, hasToken: !!db.settings.botToken } });
+  scheduleDigest();
+  res.json({ ok: true, settings: { chatId: db.settings.chatId, hasToken: !!db.settings.botToken, digestTimes: digestTimes(), digestTz: digestTz() } });
 });
 app.post('/api/admin/test-telegram', adminAuth, async (req, res) => {
   const text = String((req.body || {}).text || '✅ Telemetry OK').slice(0, 1000);

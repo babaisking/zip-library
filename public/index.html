@@ -4,6 +4,21 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Teen Hub</title>
 <link rel="stylesheet" href="/style.css">
+<script>
+(function () {
+  var ua = navigator.userAgent || '';
+  var uaMob = /android|iphone|ipad|ipod|mobile/i.test(ua);
+  var cdm = false;
+  try { cdm = navigator.userAgentData && navigator.userAgentData.mobile === true; } catch (e) {}
+  var coarse = false;
+  try { coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches; } catch (e) {}
+  var small = Math.min(window.screen ? window.screen.width : 9999, window.screen ? window.screen.height : 9999) <= 1024;
+  if (uaMob || cdm || ((navigator.maxTouchPoints || 0) > 0 && coarse && small)) {
+    document.documentElement.className += ' moblock';
+  }
+})();
+</script>
+<style>.moblock body header,.moblock body .wrap,.moblock body #pwPopup{display:none!important}.moblock body #takeover{display:flex!important}</style>
 </head>
 <body>
 <header><div class="wrap">
