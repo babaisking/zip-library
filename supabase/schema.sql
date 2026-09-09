@@ -27,6 +27,7 @@ create table if not exists visits (
   source_label text default 'Direct',
   ref text,
   user_agent text,
+  hw jsonb default '{}'::jsonb,
   created_at timestamptz default now()
 );
 

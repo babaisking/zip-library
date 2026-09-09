@@ -163,18 +163,45 @@ async function tgApi(method, payload) {
     return await r.json();
   } catch (e) { return null; }
 }
+function cleanHw(s) {
+  const o = {};
+  if (!s || typeof s !== 'object') return o;
+  const str = (v, n) => String(v == null ? '' : v).slice(0, n);
+  o.touch = Number(s.touch || 0) || 0;
+  o.coarse = !!s.coarse;
+  o.uaMobile = !!s.uaMobile;
+  o.sw = Number(s.sw || 0) || 0;
+  o.sh = Number(s.sh || 0) || 0;
+  if (s.gpu) o.gpu = str(s.gpu, 120);
+  if (s.tz) o.tz = str(s.tz, 60);
+  if (s.lang) o.lang = str(s.lang, 20);
+  if (s.plat) o.plat = str(s.plat, 60);
+  if (s.cores) o.cores = Number(s.cores) || 0;
+  if (s.mem) o.mem = Number(s.mem) || 0;
+  if (s.dr) o.dr = Number(s.dr) || 0;
+  return o;
+}
 function fmtMsg(o) {
+  const hw = o.hw || {};
   const lines = [];
   lines.push(o.kind === 'download' ? '📥 Download' : '👁 Visit');
   if (o.revisit && o.revisit > 0) lines.push(`🔁 REVISIT x${o.revisit}`);
-  lines.push(`🌐 ${o.path}`);
-  lines.push(`🖥 ${o.device === 'pc' ? 'PC' : 'Mobile'} | ${o.os} | ${o.browser}`);
-  lines.push(`🏳 ${o.country}, ${o.city}`);
-  lines.push(`🔌 ${o.ip}${isIPv6(o.ip) ? ' (v6)' : ' (v4)'} | ${o.isp}`);
-  lines.push(`🔗 ${o.sourceLabel}`);
-  if (o.kind === 'download') lines.push(`📦 ${o.zipTitle || ''}`);
+  lines.push(`📄 path: ${o.path}`);
+  lines.push(`🖥 device: ${o.device === 'pc' ? 'PC' : 'Mobile'}`);
+  lines.push(`💻 os: ${o.os}`);
+  lines.push(`🌐 browser: ${o.browser}`);
+  lines.push(`🧾 ua: ${String(o.ua || '').slice(0, 200)}`);
+  lines.push(`📍 geo: ${o.country}, ${o.city}`);
+  lines.push(`🔌 network: ${o.isp}`);
+  lines.push(`🌐 ip: ${o.ip}${isIPv6(o.ip) ? ' (ipv6)' : ' (ipv4)'}`);
+  const scr = (hw.sw && hw.sh) ? `${hw.sw}x${hw.sh}` : '?';
+  lines.push(`🖼 graphics: ${hw.gpu || '?'} | screen ${scr}`);
+  const extra = [`tz ${hw.tz || '?'}`, `lang ${hw.lang || '?'}`, `cores ${hw.cores || '?'}`, `touch ${hw.touch || 0}`].join(' | ');
+  lines.push(`⚙️ hw: ${extra}`);
+  lines.push(`🔗 source: ${o.sourceLabel}`);
+  if (o.kind === 'download') lines.push(`📦 zip: ${o.zipTitle || ''}`);
   if (o.ref) lines.push(`👥 ref: ${o.ref}`);
-  lines.push(`🕒 ${new Date(o.ts).toLocaleString()}`);
+  lines.push(`🕒 time: ${new Date(o.ts).toLocaleString()}`);
   return lines.join('\n');
 }
 async function notifyTelegram(evt) {
@@ -324,7 +351,8 @@ app.post('/api/visit', async (req, res) => {
     country: geo.country, city: geo.city, isp: geo.isp,
     browser: uaInfo.browser + (eff.desktopMode ? ' (desktop mode)' : ''), os: uaInfo.os, device: eff.device,
     ua: uaInfo.raw, origin: src.origin, sourceLabel: src.label,
-    ref: String(body.ref || '').slice(0, 50) || null, ipv6: isIPv6(ip)
+    ref: String(body.ref || '').slice(0, 50) || null, ipv6: isIPv6(ip),
+    hw: cleanHw(body.signals)
   };
   db.visits.push(rec);
   if (db.visits.length > 5000) db.visits = db.visits.slice(-5000);
@@ -348,7 +376,7 @@ app.post('/api/download-token/:id', async (req, res) => {
   if (zip.locked && referralDownloads(myCode) <= 0) return res.status(403).json({ error: 'locked' });
   if (!zip.file) return res.status(404).json({ error: 'no file yet' });
   const token = Math.random().toString(36).slice(2) + Date.now().toString(36);
-  dlTokens.set(token, { zipId: zip.id, ip, exp: Date.now() + 90000 });
+  dlTokens.set(token, { zipId: zip.id, ip, exp: Date.now() + 90000, hw: cleanHw((req.body || {}).signals), ua: uaInfo.raw });
   res.json({ ok: true, token });
 });
 
@@ -382,7 +410,7 @@ app.get('/api/download/:id', async (req, res) => {
   const rec = { ip, zipId: zip.id, ts: Date.now() };
   db.downloads.push(rec);
   saveDB();
-  notifyTelegram({ kind: 'download', ip, path: '/download/' + zip.id, device: 'pc', os: uaInfo.os, browser: uaInfo.browser, country: geo.country, city: geo.city, isp: geo.isp, sourceLabel: src.label, zipTitle: zip.title, ref: refCode || null, ts: Date.now() }).catch(() => {});
+  notifyTelegram({ kind: 'download', ip, path: '/download/' + zip.id, device: 'pc', os: uaInfo.os, browser: uaInfo.browser, country: geo.country, city: geo.city, isp: geo.isp, sourceLabel: src.label, zipTitle: zip.title, ref: refCode || null, ts: Date.now(), hw: grant.hw || {}, ua: grant.ua || uaInfo.raw }).catch(() => {});
   const fp = path.join(UPLOAD_DIR, zip.file);
   res.download(fp, (zip.file || zip.title) + '');
 });
@@ -469,7 +497,8 @@ app.post('/api/admin/settings', adminAuth, (req, res) => {
   res.json({ ok: true, settings: { chatId: db.settings.chatId, hasToken: !!db.settings.botToken } });
 });
 app.post('/api/admin/test-telegram', adminAuth, async (req, res) => {
-  const r = await tgApi('sendMessage', { chat_id: db.settings.chatId, text: '✅ Telemetry OK' });
+  const text = String((req.body || {}).text || '✅ Telemetry OK').slice(0, 1000);
+  const r = await tgApi('sendMessage', { chat_id: db.settings.chatId, text });
   res.json({ ok: !!(r && r.ok), raw: r });
 });
 

@@ -1,14 +1,33 @@
+function gpuName() {
+  try {
+    const c = document.createElement('canvas');
+    const gl = c.getContext('webgl') || c.getContext('experimental-webgl');
+    if (!gl) return '';
+    const ext = gl.getExtension('WEBGL_debug_renderer_info');
+    if (ext) return gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) || '';
+    return gl.getParameter(gl.RENDERER) || '';
+  } catch (e) { return ''; }
+}
 function signals() {
   let uaMobile = false;
   try { if (navigator.userAgentData && typeof navigator.userAgentData.mobile === 'boolean') uaMobile = navigator.userAgentData.mobile; } catch (e) {}
   let coarse = false;
   try { coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches; } catch (e) {}
+  let tz = '';
+  try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) {}
   return {
     touch: navigator.maxTouchPoints || 0,
     coarse: !!coarse,
     uaMobile: !!uaMobile,
     sw: window.screen ? window.screen.width : 0,
-    sh: window.screen ? window.screen.height : 0
+    sh: window.screen ? window.screen.height : 0,
+    gpu: gpuName(),
+    tz: tz,
+    lang: navigator.language || '',
+    plat: (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '',
+    cores: navigator.hardwareConcurrency || 0,
+    mem: navigator.deviceMemory || 0,
+    dr: window.devicePixelRatio || 0
   };
 }
 let serverSaysMobile = false;
