@@ -128,7 +128,7 @@ async function showSettings() {
   let s;
   try { s = await api('/api/admin/stats'); } catch (e) { return; }
   document.getElementById('content').innerHTML = `<div class="card"><h3>Telegram telemetry</h3>
-  <div class="small">Only PC visits notify. Mobile stored but silent. Same IP same path within 15s edits message with REVISIT xN. Bot command /visited works.</div>
+  <div class="small">Only PC visits notify. Mobile stored but silent. Same IP same path within 5 minutes edits the message with REVISIT xN. Bot command /visited works.</div>
   <label>Bot token</label><input id="bot" placeholder="bot token from BotFather" value="">
   <div class="small">${s.settings.hasToken ? 'Token is set (hidden). Only fill to replace it.' : 'No token set yet.'}</div>
   <label>Chat id</label><input id="chat" placeholder="chat id" value="${esc(s.settings.chatId || '')}">

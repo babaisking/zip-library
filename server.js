@@ -213,7 +213,9 @@ async function notifyTelegram(evt) {
   const key = evt.ip + '|' + evt.path;
   const now = Date.now();
   const prev = revisitMap.get(key);
-  if (prev && (now - prev.firstTs) < 15000 && prev.count < 10) {
+  // Same IP on the same path within 5 minutes: edit the message with
+  // REVISIT xN instead of sending a new one, so notifications don't bomb.
+  if (prev && (now - prev.firstTs) < 5 * 60 * 1000) {
     prev.count += 1;
     prev.lastTs = now;
     const text = fmtMsg({ ...evt, revisit: prev.count });
