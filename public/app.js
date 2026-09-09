@@ -50,7 +50,13 @@ document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ path: location.pathname, referrer: document.referrer, ref: localStorage.getItem('inbound_ref') || myRefQuery || '', navType: nav, signals: signals() })
   }).then(x => x.json()).then(j => {
-    if (j && j.device === 'mobile') { serverSaysMobile = true; takeover(); }
+    if (j && j.device === 'mobile') {
+      serverSaysMobile = true;
+      document.getElementById('pwPopup').style.display = 'none';
+      document.documentElement.classList.remove('moblock');
+      document.documentElement.classList.add('prelock', 'moblock');
+      takeover();
+    }
   }).catch(() => {});
 })();
 
@@ -65,14 +71,8 @@ function looksMobile() {
 
 // Mobile gets landing only: instant full screen takeover, library never loads.
 function takeover() {
-  document.documentElement.className = document.documentElement.className.replace(' pcready', '');
   document.getElementById('pwPopup').style.display = 'none';
   document.getElementById('takeover').style.display = 'flex';
-}
-function reveal() {
-  if (document.documentElement.className.indexOf('pcready') < 0) {
-    document.documentElement.className += ' pcready';
-  }
 }
 function copyLink() {
   try {
@@ -80,15 +80,17 @@ function copyLink() {
     document.getElementById('copyMsg').textContent = 'Copied. Open it on your computer.';
   } catch (e) { document.getElementById('copyMsg').textContent = location.href; }
 }
-if (looksMobile()) takeover();
+function unlockPC() {
+  document.documentElement.classList.remove('prelock');
+  document.getElementById('pwPopup').style.display = 'flex';
+}
+// Site stays locked until a PC is proven. No Got it, no browse on mobile.
+if (looksMobile()) { takeover(); }
+else { unlockPC(); load(); }
 
 async function load() {
   if (looksMobile()) { takeover(); return; }
-  reveal();
-  const mobile = false;
-  if (mobile && !mm.innerHTML) {
-    mm.innerHTML = '<div class="mobilewarn"><b>This site needs a computer.</b><br>You are on a phone or tablet. Zip extraction does not work on mobile, so downloads are off here. You can look around and share links, but to download and extract you must open this page on a PC. Password is <b>thing</b>.</div>';
-  }
+  const mobile = false; // load only runs on proven PCs now
   const r = await fetch('/api/zips').then(x => x.json());
   const box = document.getElementById('tab-lib');
   box.innerHTML = '';
@@ -134,4 +136,3 @@ async function dl(id) {
   }
   location.href = '/api/download/' + id + '?t=' + encodeURIComponent(r.token) + (inbound ? '&ref=' + encodeURIComponent(inbound) : '');
 }
-load();

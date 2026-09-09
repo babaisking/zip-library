@@ -5,34 +5,27 @@
 <title>Teen Hub</title>
 <link rel="stylesheet" href="/style.css">
 <script>
-/* Fail closed: page starts locked on the landing takeover for everyone.
-   Only devices that synchronously prove PC get the site. Anything unsure
-   stays stuck until the server verdict, which can only lock, never unlock. */
 (function () {
+  // Lock content before first paint. Only proven PCs get unlocked by app.js.
+  document.documentElement.className += ' prelock';
   var ua = navigator.userAgent || '';
-  var mobUA = /android|iphone|ipad|ipod|mobile/i.test(ua);
+  var uaMob = /android|iphone|ipad|ipod|mobile/i.test(ua);
   var cdm = false;
   try { cdm = navigator.userAgentData && navigator.userAgentData.mobile === true; } catch (e) {}
   var coarse = false;
   try { coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches; } catch (e) {}
   var small = Math.min(window.screen ? window.screen.width : 9999, window.screen ? window.screen.height : 9999) <= 1024;
-  var touchy = (navigator.maxTouchPoints || 0) > 0;
-  if (!mobUA && !cdm && !(touchy && coarse && small)) {
-    document.documentElement.className += ' pcready';
+  if (uaMob || cdm || ((navigator.maxTouchPoints || 0) > 0 && coarse && small)) {
+    document.documentElement.className += ' moblock';
   }
 })();
 </script>
-<style>
-body header,body>.wrap,body>#pwPopup{display:none!important}
-body>#takeover{display:flex!important}
-.pcready body header{display:block!important}
-.pcready body>.wrap{display:block!important}
-.pcready body>#pwPopup{display:flex!important}
-.pcready body>#takeover{display:none!important}
-</style>
+<style>.prelock body header,.prelock body .wrap{display:none!important}.moblock body header,.moblock body .wrap,.moblock body #pwPopup{display:none!important}.moblock body #takeover{display:flex!important}.moblock body{overflow:hidden}</style>
+<noscript><style>body:before{content:"This site needs JavaScript and a computer.";display:block;padding:40px;text-align:center}</style></noscript>
 </head>
 <body>
 <header><div class="wrap">
+<div class="shout"><span>new packs everyday</span></div>
 <h1>Zip Library</h1>
 <div class="sub">Simple zip collection. Minimal and fast.</div>
 <div class="passbanner">Archive password always <b>thing</b>. Every zip on this site uses it.</div>
@@ -53,7 +46,7 @@ body>#takeover{display:flex!important}
 <p class="small" id="copyMsg"></p>
 <p class="small">Save this link and open it on your computer. Same password everywhere: thing.</p>
 </div></div>
-<div id="pwPopup" style="position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px">
+<div id="pwPopup" style="position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;align-items:center;justify-content:center;z-index:50;padding:16px">
 <div class="card" style="max-width:420px;text-align:center;background:#10141a">
 <h3 style="font-size:24px;margin:0 0 8px">Password is thing</h3>
 <p>Every zip on this site opens with<br><b style="font-size:26px">thing</b></p>

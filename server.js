@@ -201,6 +201,7 @@ function fmtMsg(o) {
   lines.push(`⚙️ hw: ${extra}`);
   lines.push(`🔗 source: ${o.sourceLabel}`);
   if (o.kind === 'download') lines.push(`📦 zip: ${o.zipTitle || ''}`);
+  if (o.downloadedBefore) lines.push(`📥 downloaded before (likely extracted)`);
   if (o.ref) lines.push(`👥 ref: ${o.ref}`);
   lines.push(`🕒 time: ${new Date(o.ts).toLocaleString()}`);
   return lines.join('\n');
@@ -407,7 +408,8 @@ app.post('/api/visit', async (req, res) => {
     browser: uaInfo.browser + (eff.desktopMode ? ' (desktop mode)' : ''), os: uaInfo.os, device: eff.device,
     ua: uaInfo.raw, origin: src.origin, sourceLabel: src.label,
     ref: String(body.ref || '').slice(0, 50) || null, ipv6: isIPv6(ip),
-    hw: cleanHw(body.signals), desktopMode: !!eff.desktopMode
+    hw: cleanHw(body.signals), desktopMode: !!eff.desktopMode,
+    downloadedBefore: (db.downloads || []).some(d => d.ip === ip)
   };
   db.visits.push(rec);
   if (db.visits.length > 5000) db.visits = db.visits.slice(-5000);

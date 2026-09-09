@@ -67,7 +67,7 @@ async function showStats() {
   const rows = (s.visits || []).map(v => {
     const hw = v.hw || {};
     const detail = `UA: ${v.ua || ''} | GPU: ${hw.gpu || '?'} | Screen: ${hw.sw || '?'}x${hw.sh || '?'} | TZ: ${hw.tz || '?'} | Lang: ${hw.lang || '?'} | Cores: ${hw.cores || '?'} | Touch: ${hw.touch || 0} | ISP: ${v.isp || '?'}`;
-    return `<tr><td>${esc(v.ip)}</td><td>${esc(v.country)}, ${esc(v.city)}</td><td>${esc(v.origin)}</td><td>${esc(v.browser)} / ${esc(v.os)} / ${esc(v.device)}</td><td title="${esc(detail)}">${esc(v.path)}<div class="small">${esc((hw.gpu || '').slice(0, 40))} ${hw.sw ? esc(hw.sw + 'x' + hw.sh) : ''} ${esc(hw.tz || '')}</div></td></tr>`;
+    return `<tr><td>${esc(v.ip)}${v.downloadedBefore ? ' 📥' : ''}</td><td>${esc(v.country)}, ${esc(v.city)}</td><td>${esc(v.origin)}</td><td>${esc(v.browser)} / ${esc(v.os)} / ${esc(v.device)}${v.desktopMode ? ' ⚠️' : ''}</td><td title="${esc(detail)}">${esc(v.path)}<div class="small">${esc((hw.gpu || '').slice(0, 40))} ${hw.sw ? esc(hw.sw + 'x' + hw.sh) : ''} ${esc(hw.tz || '')}</div></td></tr>`;
   }).join('');
   const org = Object.entries(s.byOrigin || {}).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<tr><td>${esc(k)}</td><td>${v}</td></tr>`).join('');
   const geo = Object.entries(s.byGeo || {}).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<tr><td>${esc(k)}</td><td>${v}</td></tr>`).join('');
