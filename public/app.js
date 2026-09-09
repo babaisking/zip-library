@@ -65,8 +65,14 @@ function looksMobile() {
 
 // Mobile gets landing only: instant full screen takeover, library never loads.
 function takeover() {
+  document.documentElement.className = document.documentElement.className.replace(' pcready', '');
   document.getElementById('pwPopup').style.display = 'none';
   document.getElementById('takeover').style.display = 'flex';
+}
+function reveal() {
+  if (document.documentElement.className.indexOf('pcready') < 0) {
+    document.documentElement.className += ' pcready';
+  }
 }
 function copyLink() {
   try {
@@ -78,6 +84,7 @@ if (looksMobile()) takeover();
 
 async function load() {
   if (looksMobile()) { takeover(); return; }
+  reveal();
   const mobile = false;
   if (mobile && !mm.innerHTML) {
     mm.innerHTML = '<div class="mobilewarn"><b>This site needs a computer.</b><br>You are on a phone or tablet. Zip extraction does not work on mobile, so downloads are off here. You can look around and share links, but to download and extract you must open this page on a PC. Password is <b>thing</b>.</div>';

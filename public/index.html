@@ -5,20 +5,31 @@
 <title>Teen Hub</title>
 <link rel="stylesheet" href="/style.css">
 <script>
+/* Fail closed: page starts locked on the landing takeover for everyone.
+   Only devices that synchronously prove PC get the site. Anything unsure
+   stays stuck until the server verdict, which can only lock, never unlock. */
 (function () {
   var ua = navigator.userAgent || '';
-  var uaMob = /android|iphone|ipad|ipod|mobile/i.test(ua);
+  var mobUA = /android|iphone|ipad|ipod|mobile/i.test(ua);
   var cdm = false;
   try { cdm = navigator.userAgentData && navigator.userAgentData.mobile === true; } catch (e) {}
   var coarse = false;
   try { coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches; } catch (e) {}
   var small = Math.min(window.screen ? window.screen.width : 9999, window.screen ? window.screen.height : 9999) <= 1024;
-  if (uaMob || cdm || ((navigator.maxTouchPoints || 0) > 0 && coarse && small)) {
-    document.documentElement.className += ' moblock';
+  var touchy = (navigator.maxTouchPoints || 0) > 0;
+  if (!mobUA && !cdm && !(touchy && coarse && small)) {
+    document.documentElement.className += ' pcready';
   }
 })();
 </script>
-<style>.moblock body header,.moblock body .wrap,.moblock body #pwPopup{display:none!important}.moblock body #takeover{display:flex!important}</style>
+<style>
+body header,body>.wrap,body>#pwPopup{display:none!important}
+body>#takeover{display:flex!important}
+.pcready body header{display:block!important}
+.pcready body>.wrap{display:block!important}
+.pcready body>#pwPopup{display:flex!important}
+.pcready body>#takeover{display:none!important}
+</style>
 </head>
 <body>
 <header><div class="wrap">
