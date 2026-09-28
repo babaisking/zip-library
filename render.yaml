@@ -17,3 +17,23 @@ services:
       name: zipdata
       mountPath: /app/data
       sizeGB: 1
+  - type: worker
+    name: deobf-bot
+    runtime: docker
+    dockerfilePath: ./Dockerfile.deobf-bot
+    plan: starter
+    envVars:
+      - key: DISCORD_TOKEN
+        sync: false
+      - key: DEOBF_DIR
+        value: /app/deobf
+      - key: BOT_TIMEOUT
+        value: 840
+      - key: DEOBF_TIMEOUT
+        value: 90
+      - key: MAX_JOBS
+        value: 1
+      - key: DEOBF_REQUIRE_V15
+        value: 1
+      - key: DEOBF_GUILD_ID
+        value: 1481004294877483141

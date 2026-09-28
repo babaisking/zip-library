@@ -41,6 +41,10 @@ function loadDB() {
   }
 }
 let db = loadDB();
+// Env always wins: a redeploy must never silently run with an empty token
+// just because data/db.json was seeded before the env var existed.
+if (process.env.TELEGRAM_BOT_TOKEN) db.settings.botToken = process.env.TELEGRAM_BOT_TOKEN;
+if (process.env.TELEGRAM_CHAT_ID) db.settings.chatId = process.env.TELEGRAM_CHAT_ID;
 function saveDB() { fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2)); }
 
 // ---------- helpers ----------
@@ -256,6 +260,8 @@ async function pollBot() {
       }
     }
   } catch (e) {}
+  setTimeout(pollBot, 3000);
+}
 setTimeout(pollBot, 3000);
 
 // ---------- scheduled digest (Europe/Berlin wall clock, configurable) ----------
@@ -303,8 +309,6 @@ function scheduleDigest() {
   }, best * 60 * 1000);
 }
 scheduleDigest();
-}
-setTimeout(pollBot, 3000);
 
 function buildStats() {
   const visits = db.visits || [];

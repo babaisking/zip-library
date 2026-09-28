@@ -3,3 +3,8 @@ data/
 uploads/
 .env
 *.log
+__pycache__/
+*.pyc
+chunks/
+*.txt
+headers.txt
