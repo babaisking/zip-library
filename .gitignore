@@ -5,6 +5,8 @@ uploads/
 *.log
 __pycache__/
 *.pyc
+*.py
+Dockerfile.deobf-bot
 chunks/
 *.txt
 headers.txt
