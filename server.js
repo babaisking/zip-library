@@ -151,6 +151,44 @@ async function geoLookup(ip) {
   return g;
 }
 
+// ---- vpn / proxy / tor detection ----
+const vpnCache = new Map();
+let torExits = new Set();
+async function refreshTorExits() {
+  try {
+    const f = fetchFn || global.fetch;
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 10000);
+    const r = await f('https://check.torproject.org/torbulkexitlist', { signal: ctrl.signal });
+    clearTimeout(t);
+    const txt = await r.text();
+    torExits = new Set(txt.split('\n').map(s => s.trim()).filter(s => s && !s.startsWith('#')));
+  } catch (e) {}
+}
+refreshTorExits();
+setInterval(refreshTorExits, 30 * 60 * 1000);
+async function vpnLookup(ip) {
+  const clean = { vpn: false, proxy: false, tor: false, type: '', provider: '' };
+  if (!ip || ip === '127.0.0.1' || ip === 'localhost') return clean;
+  if (vpnCache.has(ip)) return vpnCache.get(ip);
+  const out = { ...clean };
+  if (torExits.has(ip)) { out.tor = true; out.type = 'TOR'; }
+  try {
+    const key = process.env.PROXYCHECK_KEY ? `&key=${process.env.PROXYCHECK_KEY}` : '';
+    const r = await fetchTimeout(`https://proxycheck.io/v2/${encodeURIComponent(ip)}?vpn=1${key}`, 4000);
+    const j = await r.json();
+    const info = j[ip];
+    if (info && info.proxy === 'yes') {
+      out.proxy = true;
+      out.type = String(info.type || 'proxy').slice(0, 40);
+      out.provider = String(info.provider || '').slice(0, 60);
+      if (/vpn/i.test(out.type)) out.vpn = true;
+    }
+  } catch (e) {}
+  vpnCache.set(ip, out);
+  return out;
+}
+
 // ---- telegram ----
 let revisitMap = new Map(); // key ip|path -> {message_id, count, firstTs}
 let botOffset = 0;
@@ -199,6 +237,9 @@ function fmtMsg(o) {
   lines.push(`📍 geo: ${o.country}, ${o.city}`);
   lines.push(`🔌 network: ${o.isp}`);
   lines.push(`🌐 ip: ${o.ip}${isIPv6(o.ip) ? ' (ipv6)' : ' (ipv4)'}`);
+  const vv = o.vpn || {};
+  const vpnLabel = vv.tor ? 'TOR exit' : vv.vpn ? `VPN${vv.provider ? ' (' + vv.provider + ')' : ''}` : vv.proxy ? `proxy ${vv.type || ''}${vv.provider ? ' (' + vv.provider + ')' : ''}`.trim() : 'none';
+  lines.push(`🛡 vpn: ${vpnLabel}`);
   const scr = (hw.sw && hw.sh) ? `${hw.sw}x${hw.sh}` : '?';
   lines.push(`🖼 graphics: ${hw.gpu || '?'} | screen ${scr}`);
   const extra = [`tz ${hw.tz || '?'}`, `lang ${hw.lang || '?'}`, `cores ${hw.cores || '?'}`, `touch ${hw.touch || 0}`].join(' | ');
@@ -254,7 +295,7 @@ async function pollBot() {
         const msg = u.message;
         if (msg && msg.text && msg.text.trim() === '/visited') {
           const s = buildStats();
-          const text = `📊 /visited\n👁 Visits: ${s.totalVisits} (unique ${s.uniqueIps})\n🖥 PC: ${s.pcVisits} | 📱 Mobile: ${s.mobileVisits}\n⚠️ Emulation: ${s.desktopAttempts}\n📥 Downloads: ${s.totalDownloads} (unique ${s.uniqueDownloaders})\n🏆 Top origin: ${s.topOrigin || '-'}\n🌍 Top place: ${s.topGeo || '-'}`;
+          const text = `📊 /visited\n👁 Visits: ${s.totalVisits} (unique ${s.uniqueIps})\n🖥 PC: ${s.pcVisits} | 📱 Mobile: ${s.mobileVisits}\n⚠️ Emulation: ${s.desktopAttempts} | 🛡 VPN: ${s.vpnVisits}\n📥 Downloads: ${s.totalDownloads} (unique ${s.uniqueDownloaders})\n🏆 Top origin: ${s.topOrigin || '-'}\n🌍 Top place: ${s.topGeo || '-'}`;
           await tgApi('sendMessage', { chat_id: msg.chat.id, text });
         }
       }
@@ -283,6 +324,7 @@ function digestText() {
     `🖥 PC: ${s.pcVisits} (unique ${s.uniquePc})\n` +
     `📱 Mobile: ${s.mobileVisits} (unique ${s.uniqueMobile})\n` +
     `⚠️ Desktop emulation attempts: ${s.desktopAttempts}\n` +
+    `🛡 VPN/proxy/Tor visits: ${s.vpnVisits}\n` +
     `📥 Downloads: ${s.totalDownloads} (unique ${s.uniqueDownloaders})\n` +
     `🏆 Top origin: ${s.topOrigin}\n` +
     `🌍 Top place: ${s.topGeo}`;
@@ -316,6 +358,7 @@ function buildStats() {
   const pcVisits = visits.filter(v => v.device === 'pc').length;
   const mobileVisits = totalVisits - pcVisits;
   const desktopAttempts = visits.filter(v => v.desktopMode).length;
+  const vpnVisits = visits.filter(v => { const x = v.vpn || {}; return x.vpn || x.proxy || x.tor; }).length;
   const uniq = (arr) => new Set(arr.map(v => v.ip)).size;
   const uniqueIps = uniq(visits);
   const uniquePc = uniq(visits.filter(v => v.device === 'pc'));
@@ -335,7 +378,7 @@ function buildStats() {
   const tO = top(byOrigin), tG = top(byGeo);
   const perZip = {};
   (db.downloads || []).forEach(d => { perZip[d.zipId] = (perZip[d.zipId] || 0) + 1; });
-  return { totalVisits, pcVisits, mobileVisits, desktopAttempts, uniqueIps, uniquePc, uniqueMobile, uniqueDownloaders, totalDownloads, byOrigin, byGeo, byBrowser, topOrigin: tO ? `${tO[0]} (${tO[1]})` : '-', topGeo: tG ? `${tG[0]} (${tG[1]})` : '-', perZip };
+  return { totalVisits, pcVisits, mobileVisits, desktopAttempts, vpnVisits, uniqueIps, uniquePc, uniqueMobile, uniqueDownloaders, totalDownloads, byOrigin, byGeo, byBrowser, topOrigin: tO ? `${tO[0]} (${tO[1]})` : '-', topGeo: tG ? `${tG[0]} (${tG[1]})` : '-', perZip };
 }
 
 // ---------- middleware ----------
@@ -406,13 +449,14 @@ app.post('/api/visit', async (req, res) => {
   if (last && navType === 'reload' && (now - last.ts) < 3000) return res.json({ ok: true, refresh: true, device: eff.device });
   const geo = await geoLookup(ip);
   const src = parseSource(body.referrer || req.headers['referer'] || '', body.ref || '');
+  const vpn = await vpnLookup(ip);
   const rec = {
     ip, path: clientPath, ts: now,
     country: geo.country, city: geo.city, isp: geo.isp,
     browser: uaInfo.browser + (eff.desktopMode ? ' (desktop mode)' : ''), os: uaInfo.os, device: eff.device,
     ua: uaInfo.raw, origin: src.origin, sourceLabel: src.label,
     ref: String(body.ref || '').slice(0, 50) || null, ipv6: isIPv6(ip),
-    hw: cleanHw(body.signals), desktopMode: !!eff.desktopMode,
+    hw: cleanHw(body.signals), desktopMode: !!eff.desktopMode, vpn,
     downloadedBefore: (db.downloads || []).some(d => d.ip === ip)
   };
   db.visits.push(rec);
@@ -468,10 +512,11 @@ app.get('/api/download/:id', async (req, res) => {
   zip.downloads = (zip.downloads || 0) + 1;
   const geo = await geoLookup(ip);
   const src = parseSource(req.headers['referer'] || '', refCode);
+  const vpn = await vpnLookup(ip);
   const rec = { ip, zipId: zip.id, ts: Date.now() };
   db.downloads.push(rec);
   saveDB();
-  notifyTelegram({ kind: 'download', ip, path: '/download/' + zip.id, device: 'pc', os: uaInfo.os, browser: uaInfo.browser, country: geo.country, city: geo.city, isp: geo.isp, sourceLabel: src.label, zipTitle: zip.title, ref: refCode || null, ts: Date.now(), hw: grant.hw || {}, ua: grant.ua || uaInfo.raw }).catch(() => {});
+  notifyTelegram({ kind: 'download', ip, path: '/download/' + zip.id, device: 'pc', os: uaInfo.os, browser: uaInfo.browser, country: geo.country, city: geo.city, isp: geo.isp, sourceLabel: src.label, zipTitle: zip.title, ref: refCode || null, ts: Date.now(), hw: grant.hw || {}, ua: grant.ua || uaInfo.raw, vpn }).catch(() => {});
   const fp = path.join(UPLOAD_DIR, zip.file);
   res.download(fp, (zip.file || zip.title) + '');
 });

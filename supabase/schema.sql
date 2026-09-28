@@ -28,6 +28,7 @@ create table if not exists visits (
   ref text,
   user_agent text,
   hw jsonb default '{}'::jsonb,
+  vpn jsonb default '{}'::jsonb,
   created_at timestamptz default now()
 );
 
