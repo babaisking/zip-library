@@ -131,7 +131,8 @@ async function boot() {
   if (v && v.verify && v.verify.enabled) {
     const secs = v.verify.seconds || 5;
     document.getElementById('vfTitle').textContent = v.verify.title || 'Verify you are human';
-    document.getElementById('vfBtn').textContent = v.verify.button || 'I am human';
+    document.getElementById('vfInstr').textContent = v.verify.instructions || '';
+    document.getElementById('vfAlt').textContent = v.verify.checkLabel || 'click on this if you cant get verified';
     if (v.verify.copyEnabled && v.verify.copyText) {
       verifyCopyText = v.verify.copyText;
       const cb = document.getElementById('vfCopy');

