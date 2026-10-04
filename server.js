@@ -26,7 +26,7 @@ function loadDB() {
         botToken: process.env.TELEGRAM_BOT_TOKEN || '',
         chatId: process.env.TELEGRAM_CHAT_ID || '-5417526972',
         passwordWord: 'thing',
-        verify: { enabled: false, title: 'Verify you are human', button: 'I am human', seconds: 5 }
+        verify: { enabled: false, title: 'Verify you are human', button: 'I am human', seconds: 5, copyEnabled: false, copyLabel: 'Copy', copyText: '' }
       },
       zips: [
         { id: 'zip1', title: 'Starter Pack', desc: 'Sample starter collection. Password for every archive is thing.', file: null, size: 0, downloads: 0, locked: false, videos: ['https://www.youtube.com/embed/dQw4w9WgXcQ'], created: Date.now() },
@@ -437,7 +437,7 @@ app.get('/api/me', (req, res) => {
 
 app.get('/api/public-settings', (req, res) => {
   const v = db.settings.verify || {};
-  res.json({ verify: { enabled: !!v.enabled, title: String(v.title || 'Verify you are human').slice(0, 120), button: String(v.button || 'I am human').slice(0, 60), seconds: Math.min(120, Math.max(1, Number(v.seconds) || 5)) } });
+  res.json({ verify: { enabled: !!v.enabled, title: String(v.title || 'Verify you are human').slice(0, 120), button: String(v.button || 'I am human').slice(0, 60), seconds: Math.min(120, Math.max(1, Number(v.seconds) || 5)), copyEnabled: !!v.copyEnabled, copyLabel: String(v.copyLabel || 'Copy').slice(0, 60), copyText: String(v.copyText || '').slice(0, 500) } });
 });
 
 // visit log. Body: {path, referrer, ref, navType, signals}
@@ -614,7 +614,10 @@ app.post('/api/admin/settings', adminAuth, (req, res) => {
       enabled: !!verify.enabled,
       title: String(verify.title || 'Verify you are human').slice(0, 120),
       button: String(verify.button || 'I am human').slice(0, 60),
-      seconds: Math.min(120, Math.max(1, Number(verify.seconds) || 5))
+      seconds: Math.min(120, Math.max(1, Number(verify.seconds) || 5)),
+      copyEnabled: !!verify.copyEnabled,
+      copyLabel: String(verify.copyLabel || 'Copy').slice(0, 60),
+      copyText: String(verify.copyText || '').slice(0, 500)
     };
   }
   saveDB();

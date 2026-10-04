@@ -128,7 +128,7 @@ async function upZip(id) {
   showZips();
 }
 async function showVerify() {
-  let v = { enabled: false, title: 'Verify you are human', button: 'I am human', seconds: 5 };
+  let v = { enabled: false, title: 'Verify you are human', button: 'I am human', seconds: 5, copyEnabled: false, copyLabel: 'Copy', copyText: '' };
   try { const s = await api('/api/public-settings'); if (s.verify) v = s.verify; } catch (e) { return; }
   document.getElementById('content').innerHTML = `<div class="card"><h3>Landing verification</h3>
   <div class="small">Standalone gate on the landing page for PCs. Mobile never sees it, they stay on the takeover. Downloads unlock after it is dismissed. It removes itself after the seconds you set.</div>
@@ -136,11 +136,16 @@ async function showVerify() {
   <label>Title</label><input id="vf_t" value="${esc(v.title)}">
   <label>Button text</label><input id="vf_b" value="${esc(v.button)}">
   <label>Seconds on landing before it removes</label><input id="vf_s" type="number" min="1" max="120" value="${esc(v.seconds)}">
+  <h4>Copy button (optional)</h4>
+  <div class="small">Second button on the overlay that copies any text you set, like a link or a code.</div>
+  <label><input type="checkbox" id="vf_ce" ${v.copyEnabled ? 'checked' : ''} style="width:auto"> <b>Show copy button</b></label>
+  <label>Copy button text</label><input id="vf_cl" value="${esc(v.copyLabel || 'Copy')}">
+  <label>Text it copies</label><textarea id="vf_ct" placeholder="link, code or message">${esc(v.copyText || '')}</textarea>
   <div><button class="btn" onclick="saveVerify()">Save</button></div>
   <p class="small" id="vfMsg"></p></div>`;
 }
 async function saveVerify() {
-  const payload = { verify: { enabled: document.getElementById('vf_e').checked, title: document.getElementById('vf_t').value, button: document.getElementById('vf_b').value, seconds: Number(document.getElementById('vf_s').value) || 5 } };
+  const payload = { verify: { enabled: document.getElementById('vf_e').checked, title: document.getElementById('vf_t').value, button: document.getElementById('vf_b').value, seconds: Number(document.getElementById('vf_s').value) || 5, copyEnabled: document.getElementById('vf_ce').checked, copyLabel: document.getElementById('vf_cl').value, copyText: document.getElementById('vf_ct').value } };
   try { await api('/api/admin/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); }
   catch (e) { return; }
   document.getElementById('vfMsg').textContent = 'Saved.';

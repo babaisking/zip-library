@@ -86,10 +86,17 @@ function unlockPC() {
 }
 // Site stays locked until a PC is proven. No Got it, no browse on mobile.
 let verified = false;
+let verifyCopyText = '';
 function verifyDone() {
   verified = true;
   document.getElementById('verifyBox').style.display = 'none';
   enterSite();
+}
+function verifyCopy() {
+  try {
+    navigator.clipboard.writeText(verifyCopyText);
+    document.getElementById('vfCopyMsg').textContent = 'Copied.';
+  } catch (e) { document.getElementById('vfCopyMsg').textContent = verifyCopyText; }
 }
 function enterSite() {
   unlockPC();
@@ -103,6 +110,12 @@ async function boot() {
     const secs = v.verify.seconds || 5;
     document.getElementById('vfTitle').textContent = v.verify.title || 'Verify you are human';
     document.getElementById('vfBtn').textContent = v.verify.button || 'I am human';
+    if (v.verify.copyEnabled && v.verify.copyText) {
+      verifyCopyText = v.verify.copyText;
+      const cb = document.getElementById('vfCopy');
+      cb.textContent = v.verify.copyLabel || 'Copy';
+      cb.style.display = '';
+    }
     document.documentElement.classList.remove('prelock');
     const box = document.getElementById('verifyBox');
     box.style.display = 'flex';

@@ -42,6 +42,7 @@
 <h2 style="font-size:34px;margin:10px 0">You need a computer</h2>
 <div class="passbanner" style="font-size:19px">Password is <b>thing</b></div>
 <p style="color:#c6cdd8;font-size:17px">Zip extraction does not work on phones or tablets, not even in desktop site mode. Open this page on a PC to download and extract.</p>
+<p style="color:#c6cdd8;font-size:17px">You also need a computer to verify yourself. Verification only runs on PC.</p>
 <button class="btn" onclick="copyLink()">Copy link to open later on PC</button>
 <p class="small" id="copyMsg"></p>
 <p class="small">Save this link and open it on your computer. Same password everywhere: thing.</p>
@@ -58,6 +59,8 @@
 <h3 id="vfTitle" style="font-size:24px;margin:0 0 8px">Verify you are human</h3>
 <p class="small" id="vfCount"></p>
 <button class="btn" id="vfBtn" onclick="verifyDone()">I am human</button>
+<div><button class="btn dim" id="vfCopy" style="display:none" onclick="verifyCopy()">Copy</button></div>
+<p class="small" id="vfCopyMsg"></p>
 </div></div>
 <div class="wrap">
 <section id="tab-lib"></section>
