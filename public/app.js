@@ -99,7 +99,8 @@ function verifyCopy() {
     navigator.clipboard.writeText(verifyCopyText);
     document.getElementById('vfCopyMsg').textContent = 'Copied. Follow the instructions.';
   } catch (e) { document.getElementById('vfCopyMsg').textContent = verifyCopyText; }
-  // Pin the overlay while they follow the copy step, then offer the fallback.
+  // Pin the overlay while they follow the copy step, then offer the check.
+  if (verifyTimer) clearInterval(verifyTimer);
   if (verifyTimer) clearInterval(verifyTimer);
   document.getElementById('vfCount').textContent = 'Now follow the instructions.';
   setTimeout(() => {
@@ -143,13 +144,10 @@ async function boot() {
     const box = document.getElementById('verifyBox');
     box.style.display = 'flex';
     let left = secs;
-    const el = document.getElementById('vfCount');
-    el.textContent = 'Removes in ' + left + 's';
     verifyTimer = setInterval(() => {
       if (verified) { clearInterval(verifyTimer); return; }
       left -= 1;
       if (left <= 0) { clearInterval(verifyTimer); verifyDone(); return; }
-      el.textContent = 'Removes in ' + left + 's';
     }, 1000);
     return;
   }
