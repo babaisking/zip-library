@@ -6,7 +6,7 @@ services:
     healthCheckPath: /api/zips
     envVars:
       - key: TELEGRAM_CHAT_ID
-        value: -5417526972
+        value: -5469582589
       - key: TELEGRAM_BOT_TOKEN
         sync: false
       - key: ADMIN_USER

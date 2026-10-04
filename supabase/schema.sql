@@ -49,7 +49,7 @@ create table if not exists referrals (
 create table if not exists settings (
   id int primary key,
   bot_token text default '',
-  chat_id text default '-5417526972'
+  chat_id text default '-5469582589'
 );
 
 -- CHECK 1: RLS on
