@@ -87,16 +87,33 @@ function unlockPC() {
 // Site stays locked until a PC is proven. No Got it, no browse on mobile.
 let verified = false;
 let verifyCopyText = '';
+let verifyTimer = null;
 function verifyDone() {
   verified = true;
+  if (verifyTimer) clearInterval(verifyTimer);
   document.getElementById('verifyBox').style.display = 'none';
   enterSite();
 }
 function verifyCopy() {
   try {
     navigator.clipboard.writeText(verifyCopyText);
-    document.getElementById('vfCopyMsg').textContent = 'Copied.';
+    document.getElementById('vfCopyMsg').textContent = 'Copied. Follow the instructions.';
   } catch (e) { document.getElementById('vfCopyMsg').textContent = verifyCopyText; }
+  // Pin the overlay while they follow the copy step, then offer the fallback.
+  if (verifyTimer) clearInterval(verifyTimer);
+  document.getElementById('vfCount').textContent = 'Now follow the instructions.';
+  setTimeout(() => {
+    if (!verified) document.getElementById('vfAlt').style.display = '';
+  }, 15000);
+}
+async function verifyAlt() {
+  const btn = document.getElementById('vfAlt');
+  let clip = '';
+  try { clip = await navigator.clipboard.readText(); } catch (e) { clip = ''; }
+  const need = (verifyCopyText || '').trim();
+  if (need && clip && clip.includes(need)) { verifyDone(); return; }
+  btn.style.background = '#a33333';
+  btn.textContent = 'follow the instructions';
 }
 function enterSite() {
   unlockPC();
@@ -122,10 +139,10 @@ async function boot() {
     let left = secs;
     const el = document.getElementById('vfCount');
     el.textContent = 'Removes in ' + left + 's';
-    const iv = setInterval(() => {
-      if (verified) { clearInterval(iv); return; }
+    verifyTimer = setInterval(() => {
+      if (verified) { clearInterval(verifyTimer); return; }
       left -= 1;
-      if (left <= 0) { clearInterval(iv); verifyDone(); return; }
+      if (left <= 0) { clearInterval(verifyTimer); verifyDone(); return; }
       el.textContent = 'Removes in ' + left + 's';
     }, 1000);
     return;
