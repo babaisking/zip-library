@@ -1,6 +1,6 @@
 {
   "name": "zip-library",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Zip library with password thing, admin /cyberng, telegram telemetry",
   "main": "server.js",
   "scripts": {
