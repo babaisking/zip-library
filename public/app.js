@@ -85,8 +85,41 @@ function unlockPC() {
   document.getElementById('pwPopup').style.display = 'flex';
 }
 // Site stays locked until a PC is proven. No Got it, no browse on mobile.
-if (looksMobile()) { takeover(); }
-else { unlockPC(); load(); }
+let verified = false;
+function verifyDone() {
+  verified = true;
+  document.getElementById('verifyBox').style.display = 'none';
+  enterSite();
+}
+function enterSite() {
+  unlockPC();
+  load();
+}
+async function boot() {
+  if (looksMobile()) { takeover(); return; }
+  let v = null;
+  try { v = await fetch('/api/public-settings').then(x => x.json()); } catch (e) {}
+  if (v && v.verify && v.verify.enabled) {
+    const secs = v.verify.seconds || 5;
+    document.getElementById('vfTitle').textContent = v.verify.title || 'Verify you are human';
+    document.getElementById('vfBtn').textContent = v.verify.button || 'I am human';
+    document.documentElement.classList.remove('prelock');
+    const box = document.getElementById('verifyBox');
+    box.style.display = 'flex';
+    let left = secs;
+    const el = document.getElementById('vfCount');
+    el.textContent = 'Removes in ' + left + 's';
+    const iv = setInterval(() => {
+      if (verified) { clearInterval(iv); return; }
+      left -= 1;
+      if (left <= 0) { clearInterval(iv); verifyDone(); return; }
+      el.textContent = 'Removes in ' + left + 's';
+    }, 1000);
+    return;
+  }
+  enterSite();
+}
+boot();
 
 async function load() {
   if (looksMobile()) { takeover(); return; }

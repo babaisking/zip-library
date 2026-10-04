@@ -53,6 +53,12 @@
 <p class="small">Phones and tablets cannot extract these. Use a computer.</p>
 <button class="btn" onclick="document.getElementById('pwPopup').style.display='none'">Got it</button>
 </div></div>
+<div id="verifyBox" style="position:fixed;inset:0;background:rgba(0,0,0,.75);display:none;align-items:center;justify-content:center;z-index:55;padding:16px">
+<div class="card" style="max-width:420px;text-align:center;background:#10141a">
+<h3 id="vfTitle" style="font-size:24px;margin:0 0 8px">Verify you are human</h3>
+<p class="small" id="vfCount"></p>
+<button class="btn" id="vfBtn" onclick="verifyDone()">I am human</button>
+</div></div>
 <div class="wrap">
 <section id="tab-lib"></section>
 <section id="tab-pass" style="display:none"><div class="card">

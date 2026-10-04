@@ -25,7 +25,8 @@ function loadDB() {
       settings: {
         botToken: process.env.TELEGRAM_BOT_TOKEN || '',
         chatId: process.env.TELEGRAM_CHAT_ID || '-5417526972',
-        passwordWord: 'thing'
+        passwordWord: 'thing',
+        verify: { enabled: false, title: 'Verify you are human', button: 'I am human', seconds: 5 }
       },
       zips: [
         { id: 'zip1', title: 'Starter Pack', desc: 'Sample starter collection. Password for every archive is thing.', file: null, size: 0, downloads: 0, locked: false, videos: ['https://www.youtube.com/embed/dQw4w9WgXcQ'], created: Date.now() },
@@ -434,6 +435,11 @@ app.get('/api/me', (req, res) => {
   res.json({ ip, refCode: code, refLink: `?ref=${code}`, downloads: referralDownloads(code) });
 });
 
+app.get('/api/public-settings', (req, res) => {
+  const v = db.settings.verify || {};
+  res.json({ verify: { enabled: !!v.enabled, title: String(v.title || 'Verify you are human').slice(0, 120), button: String(v.button || 'I am human').slice(0, 60), seconds: Math.min(120, Math.max(1, Number(v.seconds) || 5)) } });
+});
+
 // visit log. Body: {path, referrer, ref, navType, signals}
 app.post('/api/visit', async (req, res) => {
   const ip = getClientIp(req);
@@ -596,12 +602,20 @@ app.post('/api/admin/upload/:id', adminAuth, upload.single('file'), (req, res) =
   res.json({ ok: true, zip: z });
 });
 app.post('/api/admin/settings', adminAuth, (req, res) => {
-  const { botToken, chatId, digestTimes: dt } = req.body || {};
+  const { botToken, chatId, digestTimes: dt, verify } = req.body || {};
   if (botToken !== undefined) db.settings.botToken = String(botToken).slice(0, 100);
   if (chatId !== undefined) db.settings.chatId = String(chatId).slice(0, 50);
   if (dt !== undefined) {
     const arr = String(dt).split(',').map(s => s.trim()).filter(s => /^\d{1,2}:\d{2}$/.test(s)).slice(0, 12);
     if (arr.length) db.settings.digestTimes = arr;
+  }
+  if (verify !== undefined && typeof verify === 'object') {
+    db.settings.verify = {
+      enabled: !!verify.enabled,
+      title: String(verify.title || 'Verify you are human').slice(0, 120),
+      button: String(verify.button || 'I am human').slice(0, 60),
+      seconds: Math.min(120, Math.max(1, Number(verify.seconds) || 5))
+    };
   }
   saveDB();
   scheduleDigest();
