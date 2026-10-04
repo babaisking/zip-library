@@ -108,8 +108,13 @@ function verifyCopy() {
 }
 async function verifyAlt() {
   const btn = document.getElementById('vfAlt');
-  let clip = '';
-  try { clip = await navigator.clipboard.readText(); } catch (e) { clip = ''; }
+  let clip = null;
+  try { clip = await navigator.clipboard.readText(); } catch (e) { clip = null; }
+  if (clip === null) {
+    btn.style.background = '#a33333';
+    btn.textContent = 'you denied clipboard access';
+    return;
+  }
   const need = (verifyCopyText || '').trim();
   if (need && clip && clip.includes(need)) { verifyDone(); return; }
   btn.style.background = '#a33333';
